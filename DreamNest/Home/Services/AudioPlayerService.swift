@@ -34,7 +34,7 @@ public final class AudioPlayerService: NSObject, AVAudioPlayerDelegate {
 
     public override init() {
         super.init()
-        configureAudioSession()
+        configureAudioSessionIfNeeded()
         registerForAudioNotifications()
     }
 
@@ -45,6 +45,9 @@ public final class AudioPlayerService: NSObject, AVAudioPlayerDelegate {
     // MARK: - Public API
 
     public func loadTrackURL(_ url: URL) throws {
+        // Recording may have switched the shared session to `.playAndRecord`.
+        // Re-assert playback so user-created recordings are audible.
+        configureAudioSessionForPlayback()
         let player = try AVAudioPlayer(contentsOf: url)
         player.delegate = self
         player.prepareToPlay()
@@ -54,6 +57,7 @@ public final class AudioPlayerService: NSObject, AVAudioPlayerDelegate {
 
     public func play() {
         guard let audioPlayer else { return }
+        configureAudioSessionForPlayback()
         audioPlayer.play()
         emitPlaybackModeChanged()
     }
@@ -117,10 +121,13 @@ public final class AudioPlayerService: NSObject, AVAudioPlayerDelegate {
 
     // MARK: - Audio session / interruptions / route changes
 
-    private func configureAudioSession() {
+    private func configureAudioSessionIfNeeded() {
         guard !isConfiguredSession else { return }
         isConfiguredSession = true
+        configureAudioSessionForPlayback()
+    }
 
+    private func configureAudioSessionForPlayback() {
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(

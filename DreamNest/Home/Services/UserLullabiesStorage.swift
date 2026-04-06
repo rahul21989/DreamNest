@@ -192,5 +192,23 @@ enum UserLullabiesStorage {
             documentsRelativePath: docsRelative
         )
     }
+
+    /// Deletes a user-created lullaby from Documents.
+    static func deleteUserLullaby(_ track: AudioTrack) throws {
+        guard let docsRelative = track.documentsRelativePath else {
+            // Not a user track; nothing to delete here.
+            return
+        }
+        guard let docsRoot = docsRootURL() else { throw UserLullabiesStorageError.missingDocumentsFolder }
+
+        let fileURL = docsRoot.appendingPathComponent(docsRelative)
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            do {
+                try FileManager.default.removeItem(at: fileURL)
+            } catch {
+                throw UserLullabiesStorageError.copyFailed
+            }
+        }
+    }
 }
 

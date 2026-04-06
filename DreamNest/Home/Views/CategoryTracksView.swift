@@ -8,6 +8,7 @@ struct CategoryTracksView: View {
 
     @State private var showFileImporter = false
     @State private var importError: String?
+    @State private var deleteError: String?
 
     @StateObject private var recordingManager = LullabyRecordingManager()
 
@@ -67,6 +68,11 @@ struct CategoryTracksView: View {
                                 .font(.footnote)
                                 .foregroundStyle(.red)
                         }
+                        if let deleteError {
+                            Text(deleteError)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                        }
                     }
                     .padding(.vertical, 6)
                 }
@@ -77,7 +83,7 @@ struct CategoryTracksView: View {
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(Array(preDownloaded.enumerated()), id: \.element.id) { index, track in
-                            lullabyRow(track: track, index: index, playlist: preDownloaded, isLullabies: true)
+                            lullabyRow(track: track, index: index, playlist: preDownloaded, isLullabies: true, canDelete: false)
                         }
                     }
                 }
@@ -88,7 +94,15 @@ struct CategoryTracksView: View {
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(Array(myLullabies.enumerated()), id: \.element.id) { index, track in
-                            lullabyRow(track: track, index: index, playlist: myLullabies, isLullabies: true)
+                            lullabyRow(track: track, index: index, playlist: myLullabies, isLullabies: true, canDelete: true)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        deleteError = nil
+                                        deleteUserLullaby(track)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
                         }
                     }
                 }
@@ -160,12 +174,23 @@ struct CategoryTracksView: View {
     }
 
     @ViewBuilder
-    private func lullabyRow(track: AudioTrack, index: Int, playlist: [AudioTrack], isLullabies: Bool) -> some View {
+    private func lullabyRow(track: AudioTrack, index: Int, playlist: [AudioTrack], isLullabies: Bool, canDelete: Bool) -> some View {
+        let isCurrent = rootViewModel.nowPlayingViewModel.currentTrackFilename == track.filename
+        let isPlayingCurrent = isCurrent && rootViewModel.nowPlayingViewModel.isPlaying
+
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(track.title)
                         .font(.headline)
+                    if isCurrent {
+                        HStack(spacing: 6) {
+                            Image(systemName: isPlayingCurrent ? "speaker.wave.2.fill" : "speaker.wave.2")
+                            Text(isPlayingCurrent ? "Playing" : "Paused")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
                     Text(track.filename)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -191,18 +216,48 @@ struct CategoryTracksView: View {
                     }
 
                     Button {
-                        rootViewModel.nowPlayingViewModel.playTrack(track, playlist: playlist, index: index)
+                        if isCurrent {
+                            rootViewModel.nowPlayingViewModel.togglePlayPause()
+                        } else {
+                            rootViewModel.nowPlayingViewModel.playTrack(track, playlist: playlist, index: index)
+                        }
                     } label: {
-                        Text("Play")
+                        Text(isCurrent ? (isPlayingCurrent ? "Pause" : "Play") : "Play")
                             .font(.headline)
                             .frame(minWidth: 78)
                     }
                     .buttonStyle(.borderedProminent)
-                    .accessibilityLabel("Play \(track.title)")
+                    .accessibilityLabel(isCurrent ? (isPlayingCurrent ? "Pause \(track.title)" : "Play \(track.title)") : "Play \(track.title)")
+
+                    if canDelete {
+                        Button(role: .destructive) {
+                            deleteError = nil
+                            deleteUserLullaby(track)
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 20, weight: .semibold))
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityLabel("Delete \(track.title)")
+                    }
                 }
             }
         }
         .padding(.vertical, 6)
+        .listRowBackground(isCurrent ? Color.accentColor.opacity(0.10) : nil)
+    }
+
+    private func deleteUserLullaby(_ track: AudioTrack) {
+        if rootViewModel.nowPlayingViewModel.currentTrackFilename == track.filename {
+            rootViewModel.nowPlayingViewModel.stopAllPlaybackAndTimers()
+        }
+        do {
+            try UserLullabiesStorage.deleteUserLullaby(track)
+            rootViewModel.refreshAudioLibrary()
+        } catch {
+            deleteError = error.localizedDescription
+        }
     }
 }
 

@@ -6,6 +6,7 @@ import AVFoundation
 public final class NowPlayingViewModel: ObservableObject {
     @Published public private(set) var playlist: [AudioTrack] = []
     @Published public private(set) var currentTrackIndex: Int?
+    @Published public private(set) var currentTrackFilename: String?
 
     @Published public private(set) var isPlaying: Bool = false
 
@@ -77,6 +78,7 @@ public final class NowPlayingViewModel: ObservableObject {
 
         self.playlist = playlist
         self.currentTrackIndex = index
+        self.currentTrackFilename = track.filename
 
         guard let url = track.fileURL() else { return }
         do {
@@ -156,6 +158,7 @@ public final class NowPlayingViewModel: ObservableObject {
 
         playlist = []
         currentTrackIndex = nil
+        currentTrackFilename = nil
         progress = 0
         currentTimeSeconds = 0
         durationSeconds = 0
@@ -172,6 +175,7 @@ public final class NowPlayingViewModel: ObservableObject {
 
         playlist = []
         currentTrackIndex = nil
+        currentTrackFilename = nil
         progress = 0
         currentTimeSeconds = 0
         durationSeconds = 0

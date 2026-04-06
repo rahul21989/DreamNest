@@ -78,16 +78,33 @@ final class LullabyRecordingManager: NSObject, ObservableObject {
 
 extension LullabyRecordingManager: AVAudioRecorderDelegate {
     func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
+        self.recorder = nil
         guard flag, let tempURL else {
+            self.tempURL = nil
+            reactivatePlaybackSession()
             onError?(LullabyRecordingError.recorderSetupFailed)
             return
         }
 
         do {
             let track = try UserLullabiesStorage.saveRecordedLullaby(from: tempURL)
+            self.tempURL = nil
+            reactivatePlaybackSession()
             onSaved?(track)
         } catch {
+            self.tempURL = nil
+            reactivatePlaybackSession()
             onError?(error)
+        }
+    }
+
+    private func reactivatePlaybackSession() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playback, mode: .default, options: [.allowBluetooth, .allowAirPlay])
+            try session.setActive(true)
+        } catch {
+            // Keep this best-effort; playback service will re-assert on play.
         }
     }
 }
