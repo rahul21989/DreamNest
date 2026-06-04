@@ -93,5 +93,13 @@ public final class DreamNestRootViewModel: ObservableObject {
         favoriteTrackFilenames = next
         favoritesStore.setFavoriteTracks(next)
     }
+
+    public func removeFavorite(_ trackFilename: String) {
+        guard favoriteTrackFilenames.contains(trackFilename) else { return }
+        var next = favoriteTrackFilenames
+        next.remove(trackFilename)
+        favoriteTrackFilenames = next
+        favoritesStore.setFavoriteTracks(next)
+    }
 }
 

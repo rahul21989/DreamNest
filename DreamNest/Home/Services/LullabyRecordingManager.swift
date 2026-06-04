@@ -5,6 +5,7 @@ import Combine
 enum LullabyRecordingError: LocalizedError {
     case permissionDenied
     case recorderSetupFailed
+    case mp3EncodingUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -12,6 +13,8 @@ enum LullabyRecordingError: LocalizedError {
             return "Microphone permission denied."
         case .recorderSetupFailed:
             return "Could not start recording."
+        case .mp3EncodingUnavailable:
+            return "MP3 recording is not available on this device."
         }
     }
 }
@@ -39,21 +42,24 @@ final class LullabyRecordingManager: NSObject, ObservableObject {
             try session.setActive(true)
 
             let tempDir = FileManager.default.temporaryDirectory
-            let tempFile = "dn_lullaby_recording_\(UUID().uuidString).m4a"
+            let tempFile = "dn_lullaby_recording_\(UUID().uuidString).mp3"
             let outURL = tempDir.appendingPathComponent(tempFile)
             tempURL = outURL
 
             let settings: [String: Any] = [
-                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+                AVFormatIDKey: Int(kAudioFormatMPEGLayer3),
                 AVSampleRateKey: 44100,
                 AVNumberOfChannelsKey: 1,
+                AVEncoderBitRateKey: 128000,
                 AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
             ]
 
             let recorder = try AVAudioRecorder(url: outURL, settings: settings)
             recorder.delegate = self
             recorder.prepareToRecord()
-            recorder.record()
+            guard recorder.record() else {
+                throw LullabyRecordingError.mp3EncodingUnavailable
+            }
             self.recorder = recorder
             isRecording = true
         } catch {

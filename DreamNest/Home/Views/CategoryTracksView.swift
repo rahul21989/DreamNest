@@ -254,6 +254,7 @@ struct CategoryTracksView: View {
         }
         do {
             try UserLullabiesStorage.deleteUserLullaby(track)
+            rootViewModel.removeFavorite(track.filename)
             rootViewModel.refreshAudioLibrary()
         } catch {
             deleteError = error.localizedDescription

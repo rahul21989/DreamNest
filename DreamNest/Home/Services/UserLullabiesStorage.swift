@@ -157,7 +157,6 @@ enum UserLullabiesStorage {
 
     /// Saves a recorded audio file from a temporary location into Documents.
     static func saveRecordedLullaby(from tempURL: URL) throws -> AudioTrack {
-        // For recordings we always store as m4a.
         try ensureFolders()
         let ext = tempURL.pathExtension.lowercased()
         guard ["m4a", "mp3"].contains(ext) else {
@@ -167,13 +166,12 @@ enum UserLullabiesStorage {
         let titleDisplay = "Voice"
         let safeTitleSegment = "Voice"
         let unique = UUID().uuidString.prefix(8)
-        let filename = "Lullabies__\(safeTitleSegment)__\(unique).m4a"
+        let filename = "Lullabies__\(safeTitleSegment)__\(unique).\(ext)"
 
         guard let destURL = lullabiesFolderURL()?.appendingPathComponent(filename) else {
             throw UserLullabiesStorageError.missingDocumentsFolder
         }
 
-        // If temp is already m4a, copy. If it's mp3, best effort copy anyway; AVAudioPlayer may still play it.
         do {
             try FileManager.default.copyItem(at: tempURL, to: destURL)
         } catch {
