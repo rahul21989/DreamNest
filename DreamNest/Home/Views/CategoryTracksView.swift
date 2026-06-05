@@ -9,246 +9,174 @@ struct CategoryTracksView: View {
     @State private var showFileImporter = false
     @State private var importError: String?
     @State private var deleteError: String?
-
     @StateObject private var recordingManager = LullabyRecordingManager()
 
+    private var isLullabies: Bool {
+        category.id.caseInsensitiveCompare("Lullabies") == .orderedSame
+    }
+    private var preDownloaded: [AudioTrack] { tracks.filter { !$0.isUserCreated } }
+    private var myLullabies:   [AudioTrack] { tracks.filter {  $0.isUserCreated } }
+
+    private let allowedTypes: [UTType] = {
+        [UTType(filenameExtension: "mp3"), UTType(filenameExtension: "m4a")].compactMap { $0 }
+    }()
+
     var body: some View {
-        let isLullabies = category.id.compare("Lullabies", options: .caseInsensitive) == .orderedSame
-
-        let preDownloaded = tracks.filter { !$0.isUserCreated }
-        let myLullabies = tracks.filter { $0.isUserCreated }
-
-        let allowedTypes: [UTType] = {
-            let mp3 = UTType(filenameExtension: "mp3")
-            let m4a = UTType(filenameExtension: "m4a")
-            return [mp3, m4a].compactMap { $0 }
-        }()
-
-        List {
-            if isLullabies {
-                Section {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Lullabies")
-                            .font(.headline)
-
-                        HStack(spacing: 12) {
-                            Button {
-                                showFileImporter = true
-                            } label: {
-                                Label("Upload", systemImage: "square.and.arrow.up")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
-
-                            Button {
-                                if recordingManager.isRecording {
-                                    recordingManager.stop()
-                                } else {
-                                    importError = nil
-                                    recordingManager.onSaved = { _ in
-                                        rootViewModel.refreshAudioLibrary()
-                                    }
-                                    recordingManager.onError = { err in
-                                        importError = err.localizedDescription
-                                    }
-                                    Task { await recordingManager.start() }
-                                }
-                            } label: {
-                                Label(
-                                    recordingManager.isRecording ? "Stop" : "Record",
-                                    systemImage: recordingManager.isRecording ? "stop.circle.fill" : "mic.circle.fill"
-                                )
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.borderedProminent)
-                        }
-
-                        if let importError {
-                            Text(importError)
-                                .font(.footnote)
-                                .foregroundStyle(.red)
-                        }
-                        if let deleteError {
-                            Text(deleteError)
-                                .font(.footnote)
-                                .foregroundStyle(.red)
-                        }
-                    }
-                    .padding(.vertical, 6)
+        ScrollView {
+            VStack(spacing: 20) {
+                // Upload / Record card (Lullabies only)
+                if isLullabies {
+                    uploadRecordCard
                 }
 
-                Section("Pre-downloaded") {
-                    if preDownloaded.isEmpty {
-                        Text("No pre-downloaded lullabies found.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(Array(preDownloaded.enumerated()), id: \.element.id) { index, track in
-                            lullabyRow(track: track, index: index, playlist: preDownloaded, isLullabies: true, canDelete: false)
-                        }
-                    }
-                }
-
-                Section("My Lullabies") {
-                    if myLullabies.isEmpty {
-                        Text("Upload or record a lullaby to save it here.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(Array(myLullabies.enumerated()), id: \.element.id) { index, track in
-                            lullabyRow(track: track, index: index, playlist: myLullabies, isLullabies: true, canDelete: true)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button(role: .destructive) {
-                                        deleteError = nil
-                                        deleteUserLullaby(track)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
-                                }
-                        }
-                    }
-                }
-            } else {
-                Section {
-                    ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(alignment: .center) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(track.title)
-                                        .font(.headline)
-                                    Text(track.filename)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 4) {
-                                    Text(track.durationSeconds.formattedMMSS())
-                                        .font(.subheadline)
-                                }
-
-                                VStack(alignment: .trailing, spacing: 8) {
-                                    Button {
-                                        rootViewModel.nowPlayingViewModel.playTrack(track, playlist: tracks, index: index)
-                                    } label: {
-                                        Text("Play")
-                                            .font(.headline)
-                                            .frame(minWidth: 78)
-                                    }
-                                    .buttonStyle(.borderedProminent)
-                                    .accessibilityLabel("Play \(track.title)")
-                                }
-                            }
-                        }
-                        .padding(.vertical, 6)
-                    }
+                // Track sections
+                if isLullabies {
+                    trackSection(title: "🎵 Lullabies", icon: "moon.stars.fill",
+                                 tracks: preDownloaded, canDelete: false)
+                    trackSection(title: "🎤 My Recordings", icon: "mic.fill",
+                                 tracks: myLullabies, canDelete: true)
+                } else {
+                    trackSection(title: category.displayName, icon: "music.note.list",
+                                 tracks: tracks, canDelete: false)
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 20)
+            .padding(.bottom, 100)   // clearance for NowPlayingView
         }
-        .listStyle(.insetGrouped)
         .navigationTitle(category.displayName)
+        .navigationBarTitleDisplayMode(.large)
         .fileImporter(
             isPresented: $showFileImporter,
-            allowedContentTypes: allowedTypes.isEmpty ? [UTType.data] : allowedTypes,
+            allowedContentTypes: allowedTypes.isEmpty ? [.data] : allowedTypes,
             allowsMultipleSelection: false
         ) { result in
-            switch result {
-            case .success(let urls):
-                guard let url = urls.first else { return }
-                let started = url.startAccessingSecurityScopedResource()
-                Task {
-                    defer {
-                        if started {
-                            url.stopAccessingSecurityScopedResource()
-                        }
+            handleImport(result)
+        }
+        .dreamNestNightMode()
+    }
+
+    // MARK: - Upload / Record card
+
+    private var uploadRecordCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Add Your Own Lullaby")
+                .font(.subheadline.bold())
+                .foregroundStyle(.primary)
+            Text("Upload a song or record your own voice — your child will love it 💛")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 12) {
+                // Upload
+                Button { showFileImporter = true } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "square.and.arrow.up.fill")
+                        Text("Upload")
+                            .font(.subheadline.weight(.semibold))
                     }
-                    do {
-                        _ = try await awaitCopyImported(url)
-                        rootViewModel.refreshAudioLibrary()
-                        importError = nil
-                    } catch {
-                        importError = error.localizedDescription
-                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.white.opacity(0.08))
+                    .foregroundStyle(.primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 1))
                 }
-            case .failure(let err):
-                importError = err.localizedDescription
+                .buttonStyle(.plain)
+
+                // Record
+                Button {
+                    if recordingManager.isRecording {
+                        recordingManager.stop()
+                    } else {
+                        importError = nil
+                        recordingManager.onSaved = { _ in rootViewModel.refreshAudioLibrary() }
+                        recordingManager.onError = { importError = $0.localizedDescription }
+                        Task { await recordingManager.start() }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: recordingManager.isRecording ? "stop.circle.fill" : "mic.circle.fill")
+                            .foregroundStyle(recordingManager.isRecording ? .red : Color.indigo)
+                        Text(recordingManager.isRecording ? "Stop" : "Record")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(recordingManager.isRecording
+                                ? Color.red.opacity(0.15)
+                                : Color.indigo.opacity(0.18))
+                    .foregroundStyle(recordingManager.isRecording ? .red : Color.indigo)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12)
+                        .stroke((recordingManager.isRecording ? Color.red : Color.indigo).opacity(0.3),
+                                lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+
+            if let err = importError ?? deleteError {
+                Label(err, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
             }
         }
+        .padding(16)
+        .background(Color.white.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18)
+            .stroke(Color.white.opacity(0.08), lineWidth: 1))
     }
+
+    // MARK: - Track section
 
     @ViewBuilder
-    private func lullabyRow(track: AudioTrack, index: Int, playlist: [AudioTrack], isLullabies: Bool, canDelete: Bool) -> some View {
-        let isCurrent = rootViewModel.nowPlayingViewModel.currentTrackFilename == track.filename
-        let isPlayingCurrent = isCurrent && rootViewModel.nowPlayingViewModel.isPlaying
-
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(track.title)
-                        .font(.headline)
-                    if isCurrent {
-                        HStack(spacing: 6) {
-                            Image(systemName: isPlayingCurrent ? "speaker.wave.2.fill" : "speaker.wave.2")
-                            Text(isPlayingCurrent ? "Playing" : "Paused")
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                    Text(track.filename)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+    private func trackSection(title: String, icon: String,
+                               tracks: [AudioTrack], canDelete: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color.indigo.opacity(0.8))
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
                 Spacer()
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(track.durationSeconds.formattedMMSS())
-                        .font(.subheadline)
-                }
+                Text("\(tracks.count)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
-                VStack(alignment: .trailing, spacing: 8) {
-                    if isLullabies {
-                        Button {
-                            rootViewModel.toggleFavorite(track.filename)
-                        } label: {
-                            Image(systemName: rootViewModel.isFavorite(track.filename) ? "heart.fill" : "heart")
-                                .font(.system(size: 22, weight: .semibold))
-                                .frame(width: 44, height: 44)
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(.pink)
-                        .accessibilityLabel(rootViewModel.isFavorite(track.filename) ? "Unfavorite \(track.title)" : "Favorite \(track.title)")
-                    }
-
-                    Button {
-                        if isCurrent {
-                            rootViewModel.nowPlayingViewModel.togglePlayPause()
-                        } else {
-                            rootViewModel.nowPlayingViewModel.playTrack(track, playlist: playlist, index: index)
-                        }
-                    } label: {
-                        Text(isCurrent ? (isPlayingCurrent ? "Pause" : "Play") : "Play")
-                            .font(.headline)
-                            .frame(minWidth: 78)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .accessibilityLabel(isCurrent ? (isPlayingCurrent ? "Pause \(track.title)" : "Play \(track.title)") : "Play \(track.title)")
-
-                    if canDelete {
-                        Button(role: .destructive) {
-                            deleteError = nil
-                            deleteUserLullaby(track)
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 20, weight: .semibold))
-                                .frame(width: 44, height: 44)
-                        }
-                        .buttonStyle(.bordered)
-                        .accessibilityLabel("Delete \(track.title)")
+            if tracks.isEmpty {
+                Text(canDelete
+                     ? "Your recordings will appear here."
+                     : "No tracks found.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 8)
+            } else {
+                VStack(spacing: 2) {
+                    ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
+                        TrackRow(
+                            track: track,
+                            index: index,
+                            playlist: tracks,
+                            isLullabies: isLullabies,
+                            canDelete: canDelete,
+                            rootViewModel: rootViewModel,
+                            onDelete: { deleteTrack(track) }
+                        )
                     }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 16))
             }
         }
-        .padding(.vertical, 6)
-        .listRowBackground(isCurrent ? Color.accentColor.opacity(0.10) : nil)
     }
 
-    private func deleteUserLullaby(_ track: AudioTrack) {
+    // MARK: - Delete
+
+    private func deleteTrack(_ track: AudioTrack) {
         if rootViewModel.nowPlayingViewModel.currentTrackFilename == track.filename {
             rootViewModel.nowPlayingViewModel.stopAllPlaybackAndTimers()
         }
@@ -256,29 +184,145 @@ struct CategoryTracksView: View {
             try UserLullabiesStorage.deleteUserLullaby(track)
             rootViewModel.removeFavorite(track.filename)
             rootViewModel.refreshAudioLibrary()
+            deleteError = nil
         } catch {
             deleteError = error.localizedDescription
         }
     }
+
+    // MARK: - Import
+
+    private func handleImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            let started = url.startAccessingSecurityScopedResource()
+            Task {
+                defer { if started { url.stopAccessingSecurityScopedResource() } }
+                do {
+                    _ = try await withCheckedThrowingContinuation { cont in
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            do {
+                                let t = try UserLullabiesStorage.importLullaby(from: url)
+                                cont.resume(returning: t)
+                            } catch { cont.resume(throwing: error) }
+                        }
+                    }
+                    rootViewModel.refreshAudioLibrary()
+                    importError = nil
+                } catch {
+                    importError = error.localizedDescription
+                }
+            }
+        case .failure(let err):
+            importError = err.localizedDescription
+        }
+    }
 }
 
-private extension CategoryTracksView {
-    func tryToCopyImported(_ url: URL) throws -> AudioTrack {
-        // Keep import work off the main thread.
-        return try UserLullabiesStorage.importLullaby(from: url)
+// MARK: - Track Row
+
+private struct TrackRow: View {
+    let track: AudioTrack
+    let index: Int
+    let playlist: [AudioTrack]
+    let isLullabies: Bool
+    let canDelete: Bool
+    @ObservedObject var rootViewModel: DreamNestRootViewModel
+    let onDelete: () -> Void
+
+    private var isCurrent: Bool {
+        rootViewModel.nowPlayingViewModel.currentTrackFilename == track.filename
+    }
+    private var isPlayingCurrent: Bool {
+        isCurrent && rootViewModel.nowPlayingViewModel.isPlaying
     }
 
-    func awaitCopyImported(_ url: URL) async throws -> AudioTrack {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let track = try UserLullabiesStorage.importLullaby(from: url)
-                    continuation.resume(returning: track)
-                } catch {
-                    continuation.resume(throwing: error)
+    var body: some View {
+        HStack(spacing: 12) {
+            // Track number / playing indicator
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isCurrent ? Color.indigo.opacity(0.4) : Color.white.opacity(0.06))
+                    .frame(width: 36, height: 36)
+
+                if isPlayingCurrent {
+                    Image(systemName: "waveform")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.indigo)
+                        .symbolEffect(.variableColor.iterative, options: .repeating)
+                } else if isCurrent {
+                    Image(systemName: "pause.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.indigo)
+                } else {
+                    Text("\(index + 1)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            // Title + duration
+            VStack(alignment: .leading, spacing: 3) {
+                Text(track.title)
+                    .font(.subheadline)
+                    .foregroundStyle(isCurrent ? Color.indigo : .primary)
+                    .lineLimit(1)
+                Text(track.durationSeconds > 0
+                     ? track.durationSeconds.formattedMMSS()
+                     : "—")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            // Favourite (lullabies only)
+            if isLullabies {
+                Button {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
+                        rootViewModel.toggleFavorite(track.filename)
+                    }
+                } label: {
+                    Image(systemName: rootViewModel.isFavorite(track.filename) ? "heart.fill" : "heart")
+                        .font(.system(size: 16))
+                        .foregroundStyle(rootViewModel.isFavorite(track.filename) ? .pink : .secondary)
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.plain)
+            }
+
+            // Play / Pause
+            Button {
+                if isCurrent {
+                    rootViewModel.nowPlayingViewModel.togglePlayPause()
+                } else {
+                    rootViewModel.nowPlayingViewModel.playTrack(track, playlist: playlist, index: index)
+                }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(isCurrent ? Color.indigo : Color.indigo.opacity(0.25))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: isPlayingCurrent ? "pause.fill" : "play.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .offset(x: isPlayingCurrent ? 0 : 1)
+                }
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(isCurrent
+                    ? Color.indigo.opacity(0.10)
+                    : Color.white.opacity(0.05))
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            if canDelete {
+                Button(role: .destructive) { onDelete() } label: {
+                    Label("Delete", systemImage: "trash")
                 }
             }
         }
     }
 }
-

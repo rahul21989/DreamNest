@@ -87,11 +87,10 @@ final class StoryGenerationService: StoryGenerationServing {
     }
 
     private static func geminiAPIKey(bundle: Bundle = .main) -> String? {
-        return "AIzaSyAexYdu8KLTeaY_V8OQLxMuJsq6VY4iOAE"
-//        let raw = bundle.object(forInfoDictionaryKey: "GEMINI_API_KEY") as? String
-//        let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines)
-//        guard let trimmed, !trimmed.isEmpty else { return nil }
-//        return trimmed
+        let raw = bundle.object(forInfoDictionaryKey: "GEMINI_API_KEY") as? String
+        let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let trimmed, !trimmed.isEmpty else { return nil }
+        return trimmed
     }
 
     private static func composePrompt(
@@ -105,19 +104,28 @@ final class StoryGenerationService: StoryGenerationServing {
         let themeLine = (theme?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? "None"
 
         return """
-        Write a simple, calming bedtime story for young kids (roughly ages 3–8).
+        You are a beloved children's author writing a bedtime story for kids aged 3–8. \
+        Your stories are magical, funny, and warm — the kind kids beg to hear again.
 
+        Story details:
         Title: \(title)
         Theme: \(themeLine)
         Preferences: \(prefsLine)
-        Parent prompt: \(prompt)
+        Parent's idea: \(prompt)
 
-        Style:
-        - Very gentle, cozy, happy and positive
-        - Short sentences, easy words
-        - About 300–400 words total
-        - Use vivid but soft imagery (nature, friends, cozy places)
-        - Format: several short paragraphs separated by a blank line (double newline). No title line or headings in the output—just the story paragraphs.
+        Rules for a great kids' bedtime story:
+        1. CHARACTERS — Give the main character a fun, memorable name (e.g. Luna the bunny, Captain Cosmo, Pip the tiny dragon). Kids connect to named characters instantly.
+        2. OPENING — Start with an exciting or funny sentence that pulls kids in straight away. No slow build-ups.
+        3. SIMPLE WORDS — Use words a 4-year-old knows. Short sentences. Punchy rhythm.
+        4. MAGIC & WONDER — Include one magical or surprising moment (a glowing door, a talking star, a secret map). Kids live for wonder.
+        5. GENTLE HUMOR — One or two light funny moments (a silly mistake, a funny sound, an unexpected friend). Kids love to giggle.
+        6. REPETITION — Use a short, fun repeated phrase once or twice (e.g. "And off they zoomed!", "Whoooosh!"). Kids adore patterns they can join in with.
+        7. EMOTION — The main character should feel something real: excited, a little scared, proud, or loved. Emotional stakes keep kids engaged.
+        8. SLEEPY ENDING — End with the character drifting off to sleep, cozy and happy. The ending should make the listening child feel warm, safe, and ready to sleep too.
+        9. LENGTH — 5–7 short paragraphs, about 350–450 words total. Not too long — kids' attention spans are precious.
+        10. FORMAT — Separate each paragraph with a blank line. No title, no headings, no bullet points — just the story paragraphs.
+
+        Write the story now:
         """
     }
 }

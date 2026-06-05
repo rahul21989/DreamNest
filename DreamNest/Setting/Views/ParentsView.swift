@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ParentsView: View {
     @ObservedObject var rootViewModel: DreamNestRootViewModel
+    var onChangePINTapped: (() -> Void)? = nil
 
     @State private var showEditor = false
     @State private var draftRoutine: Routine = Routine(name: "New Routine", steps: [])
@@ -14,6 +15,25 @@ struct ParentsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                // PIN
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Security")
+                        .font(.headline)
+                    Button {
+                        onChangePINTapped?()
+                    } label: {
+                        HStack {
+                            Text("Change Parent PIN")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(12)
+                    .background(Color.accentColor.opacity(0.10))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+
                 // Settings
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Settings")

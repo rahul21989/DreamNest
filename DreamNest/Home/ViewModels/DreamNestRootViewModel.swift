@@ -13,17 +13,17 @@ public final class DreamNestRootViewModel: ObservableObject {
     @Published public private(set) var favoriteTrackFilenames: Set<String> = []
 
     private let routineStore: RoutineStore
-    private let settingsStore: ParentsSettingsStore
+    public let parentsSettingsStore: ParentsSettingsStore
     private let favoritesStore: FavoritesStore
 
     public init(
         audioLibraryService: AudioLibraryService = AudioLibraryService(),
         routineStore: RoutineStore = RoutineStore(),
-        settingsStore: ParentsSettingsStore = ParentsSettingsStore(),
+        parentsSettingsStore: ParentsSettingsStore = ParentsSettingsStore(),
         favoritesStore: FavoritesStore = FavoritesStore()
     ) {
         self.routineStore = routineStore
-        self.settingsStore = settingsStore
+        self.parentsSettingsStore = parentsSettingsStore
         self.favoritesStore = favoritesStore
 
         let library = audioLibraryService.scanAllAudio()
@@ -31,7 +31,7 @@ public final class DreamNestRootViewModel: ObservableObject {
         self.nowPlayingViewModel = NowPlayingViewModel(library: library)
 
         self.routines = routineStore.routines.sorted { $0.updatedAt > $1.updatedAt }
-        self.parentsSettings = settingsStore.settings
+        self.parentsSettings = parentsSettingsStore.settings
 
         self.favoriteTrackFilenames = favoritesStore.loadFavoriteTracks()
     }
@@ -63,7 +63,7 @@ public final class DreamNestRootViewModel: ObservableObject {
     }
 
     public func updateParentsSettings(_ newSettings: ParentsSettings) {
-        settingsStore.update(newSettings)
+        parentsSettingsStore.update(newSettings)
         parentsSettings = newSettings
     }
 
@@ -71,11 +71,11 @@ public final class DreamNestRootViewModel: ObservableObject {
         nowPlayingViewModel.stopAllPlaybackAndTimers()
 
         routineStore.clear()
-        settingsStore.resetToDefaults()
+        parentsSettingsStore.resetToDefaults()
         favoritesStore.clear()
 
         routines = routineStore.routines.sorted { $0.updatedAt > $1.updatedAt }
-        parentsSettings = settingsStore.settings
+        parentsSettings = parentsSettingsStore.settings
         favoriteTrackFilenames = favoritesStore.loadFavoriteTracks()
     }
 

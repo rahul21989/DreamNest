@@ -27,12 +27,7 @@ extension EnvironmentValues {
 
 struct DreamNestNightMode: ViewModifier {
     func body(content: Content) -> some View {
-        // Night Theme for the entire app.
         content.preferredColorScheme(.dark)
-        .transaction { tx in
-            // Avoid motion-heavy transitions; kids' UX should feel calm.
-            tx.disablesAnimations = true
-        }
     }
 }
 

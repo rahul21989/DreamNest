@@ -5,73 +5,94 @@ import Combine
 enum LullabyRecordingError: LocalizedError {
     case permissionDenied
     case recorderSetupFailed
-    case mp3EncodingUnavailable
+    case saveFailed
 
     var errorDescription: String? {
         switch self {
         case .permissionDenied:
-            return "Microphone permission denied."
+            return "Microphone access was denied. Go to Settings → DreamNest to enable it."
         case .recorderSetupFailed:
-            return "Could not start recording."
-        case .mp3EncodingUnavailable:
-            return "MP3 recording is not available on this device."
+            return "Could not start recording. Please try again."
+        case .saveFailed:
+            return "Recording finished but could not be saved. Please try again."
         }
     }
 }
 
-/// Simple record/stop manager that saves a voice lullaby into Documents.
+/// Records a voice lullaby and saves it to the app's Documents directory.
 @MainActor
 final class LullabyRecordingManager: NSObject, ObservableObject {
+
     @Published private(set) var isRecording: Bool = false
 
     private var recorder: AVAudioRecorder?
     private var tempURL: URL?
 
-    /// Called when a new lullaby is saved successfully.
     var onSaved: ((AudioTrack) -> Void)?
-    /// Called on failures (permission/setup/copy).
     var onError: ((Error) -> Void)?
+
+    // MARK: - Start
 
     func start() async {
         do {
+            // 1. Request microphone permission
             let granted = await requestPermission()
             guard granted else { throw LullabyRecordingError.permissionDenied }
 
+            // 2. Configure audio session for recording
+            //    .mixWithOthers lets any currently-playing lullaby keep playing
+            //    while the microphone captures the parent's voice.
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
-            try session.setActive(true)
+            try session.setCategory(
+                .playAndRecord,
+                mode: .default,
+                options: [.defaultToSpeaker, .mixWithOthers]
+            )
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
 
-            let tempDir = FileManager.default.temporaryDirectory
-            let tempFile = "dn_lullaby_recording_\(UUID().uuidString).mp3"
-            let outURL = tempDir.appendingPathComponent(tempFile)
+            // 3. Build temp file URL — use .m4a (AAC), the only lossy format iOS
+            //    supports for recording. kAudioFormatMPEGLayer3 (MP3) throws an
+            //    OSStatus error on every iOS device.
+            let tempFile = "dn_lullaby_\(UUID().uuidString).m4a"
+            let outURL   = FileManager.default.temporaryDirectory
+                               .appendingPathComponent(tempFile)
             tempURL = outURL
 
+            // 4. AAC @ 44.1 kHz — excellent quality, small file size
             let settings: [String: Any] = [
-                AVFormatIDKey: Int(kAudioFormatMPEGLayer3),
-                AVSampleRateKey: 44100,
-                AVNumberOfChannelsKey: 1,
-                AVEncoderBitRateKey: 128000,
-                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+                AVFormatIDKey:             Int(kAudioFormatMPEG4AAC),
+                AVSampleRateKey:           44_100,
+                AVNumberOfChannelsKey:     1,
+                AVEncoderAudioQualityKey:  AVAudioQuality.high.rawValue,
+                AVEncoderBitRateKey:       128_000
             ]
 
+            // 5. Create recorder
             let recorder = try AVAudioRecorder(url: outURL, settings: settings)
             recorder.delegate = self
             recorder.prepareToRecord()
+
             guard recorder.record() else {
-                throw LullabyRecordingError.mp3EncodingUnavailable
+                throw LullabyRecordingError.recorderSetupFailed
             }
+
             self.recorder = recorder
-            isRecording = true
+            isRecording   = true
+
         } catch {
             onError?(error)
         }
     }
 
+    // MARK: - Stop
+
     func stop() {
         guard isRecording else { return }
         isRecording = false
-        recorder?.stop()
+        recorder?.stop()      // triggers audioRecorderDidFinishRecording
     }
+
+    // MARK: - Permission
 
     private func requestPermission() async -> Bool {
         await withCheckedContinuation { continuation in
@@ -82,36 +103,56 @@ final class LullabyRecordingManager: NSObject, ObservableObject {
     }
 }
 
-extension LullabyRecordingManager: AVAudioRecorderDelegate {
-    func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
-        self.recorder = nil
-        guard flag, let tempURL else {
-            self.tempURL = nil
-            reactivatePlaybackSession()
-            onError?(LullabyRecordingError.recorderSetupFailed)
-            return
-        }
+// MARK: - AVAudioRecorderDelegate
 
-        do {
-            let track = try UserLullabiesStorage.saveRecordedLullaby(from: tempURL)
-            self.tempURL = nil
-            reactivatePlaybackSession()
-            onSaved?(track)
-        } catch {
-            self.tempURL = nil
-            reactivatePlaybackSession()
-            onError?(error)
+extension LullabyRecordingManager: AVAudioRecorderDelegate {
+
+    nonisolated func audioRecorderDidFinishRecording(
+        _ recorder: AVAudioRecorder,
+        successfully flag: Bool
+    ) {
+        Task { @MainActor in
+            self.recorder = nil
+            defer {
+                self.reactivatePlaybackSession()
+                self.tempURL = nil
+            }
+
+            guard flag, let url = self.tempURL else {
+                self.onError?(LullabyRecordingError.saveFailed)
+                return
+            }
+
+            do {
+                let track = try UserLullabiesStorage.saveRecordedLullaby(from: url)
+                self.onSaved?(track)
+            } catch {
+                self.onError?(error)
+            }
         }
     }
 
+    nonisolated func audioRecorderEncodeErrorDidOccur(
+        _ recorder: AVAudioRecorder,
+        error: Error?
+    ) {
+        Task { @MainActor in
+            self.recorder  = nil
+            self.tempURL   = nil
+            self.isRecording = false
+            self.reactivatePlaybackSession()
+            self.onError?(error ?? LullabyRecordingError.recorderSetupFailed)
+        }
+    }
+
+    // Restore playback-only session after recording ends
     private func reactivatePlaybackSession() {
         let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playback, mode: .default, options: [.allowBluetooth, .allowAirPlay])
-            try session.setActive(true)
-        } catch {
-            // Keep this best-effort; playback service will re-assert on play.
-        }
+        try? session.setCategory(
+            .playback,
+            mode: .default,
+            options: [.allowBluetooth, .allowAirPlay]
+        )
+        try? session.setActive(true)
     }
 }
-

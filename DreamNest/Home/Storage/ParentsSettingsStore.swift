@@ -3,6 +3,7 @@ import Foundation
 public final class ParentsSettingsStore: @unchecked Sendable {
     private enum Keys {
         static let settings = "dn_parents_settings_v1"
+        static let parentPIN = "dn_parent_pin_v1"
     }
 
     static let allowedQuickSleepMinutes: [Int] = [1, 2, 5, 10, 15]
@@ -24,6 +25,28 @@ public final class ParentsSettingsStore: @unchecked Sendable {
     public func resetToDefaults() {
         settings = ParentsSettings()
         defaults.removeObject(forKey: Keys.settings)
+    }
+
+    // MARK: - PIN
+
+    /// Returns true if the parent has ever set a custom PIN.
+    public var hasPIN: Bool {
+        defaults.string(forKey: Keys.parentPIN) != nil
+    }
+
+    /// The stored PIN, or nil if none has been set yet.
+    public var storedPIN: String? {
+        defaults.string(forKey: Keys.parentPIN)
+    }
+
+    /// Saves a new PIN. Must be non-empty.
+    public func savePIN(_ pin: String) {
+        guard !pin.isEmpty else { return }
+        defaults.set(pin, forKey: Keys.parentPIN)
+    }
+
+    public func clearPIN() {
+        defaults.removeObject(forKey: Keys.parentPIN)
     }
 
     private func save() {
