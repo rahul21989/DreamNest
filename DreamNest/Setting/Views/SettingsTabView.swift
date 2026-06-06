@@ -12,8 +12,8 @@ struct SettingsTabView: View {
     @Environment(\.openURL) private var openURL
 
     // ── Update these once your pages are hosted ──────────────────────────────
-    private let supportURL    = URL(string: "https://YOUR_USERNAME.github.io/dreamnest/support.html")!
-    private let privacyURL    = URL(string: "https://YOUR_USERNAME.github.io/dreamnest/privacy.html")!
+    private let supportURL = URL(string: "https://rahul21989.github.io/DreamNest/support.html")!
+    private let privacyURL = URL(string: "https://rahul21989.github.io/DreamNest/privacy.html")!
     private let supportEmail  = "goyal021989@gmail.com"
     // ─────────────────────────────────────────────────────────────────────────
 
