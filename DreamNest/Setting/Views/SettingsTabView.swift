@@ -11,6 +11,12 @@ struct SettingsTabView: View {
 
     @Environment(\.openURL) private var openURL
 
+    // ── Update these once your pages are hosted ──────────────────────────────
+    private let supportURL    = URL(string: "https://YOUR_USERNAME.github.io/dreamnest/support.html")!
+    private let privacyURL    = URL(string: "https://YOUR_USERNAME.github.io/dreamnest/privacy.html")!
+    private let supportEmail  = "goyal021989@gmail.com"
+    // ─────────────────────────────────────────────────────────────────────────
+
     var body: some View {
         NavigationStack {
             List {
@@ -57,6 +63,69 @@ struct SettingsTabView: View {
                             Text("Open Parents")
                             Spacer()
                             Image(systemName: "lock.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Section("Support & Legal") {
+                    // Support
+                    Button { openURL(supportURL) } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "questionmark.circle.fill")
+                                .foregroundStyle(Color.indigo)
+                            Text("Help & Support")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    // Privacy Policy
+                    Button { openURL(privacyURL) } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "hand.raised.fill")
+                                .foregroundStyle(Color.indigo)
+                            Text("Privacy Policy")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    // Contact Us
+                    Button {
+                        let subject = "DreamNest Support".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+                        if let url = URL(string: "mailto:\(supportEmail)?subject=\(subject)") {
+                            openURL(url)
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "envelope.fill")
+                                .foregroundStyle(Color.indigo)
+                            Text("Contact Us")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    // Terms of Use (Apple standard EULA)
+                    Button {
+                        if let url = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/") {
+                            openURL(url)
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "doc.text.fill")
+                                .foregroundStyle(Color.indigo)
+                            Text("Terms of Use")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                     }
