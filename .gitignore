@@ -47,5 +47,5 @@ GoogleService-Info.plist
 *.swp
 *.tmp
 
-# App-specific (optional)
-# Add any generated files here
+# Secrets — never commit these
+Info.plist
