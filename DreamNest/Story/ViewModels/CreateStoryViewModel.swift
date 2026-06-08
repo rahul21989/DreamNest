@@ -21,6 +21,9 @@ final class CreateStoryViewModel: ObservableObject {
 
     @Published private(set) var savedStories: [Story] = []
 
+    /// Fires when the user tries to generate but has hit the daily cap.
+    @Published var showLimitAlert: Bool = false
+
     private let generator: StoryGenerationServing
     private let store: StoryStore
 
@@ -40,6 +43,13 @@ final class CreateStoryViewModel: ObservableObject {
 
     func generate() async {
         guard canGenerate else { return }
+
+        // Check daily limit before calling the API
+        if StoryLimitStore.hasReachedLimit {
+            showLimitAlert = true
+            return
+        }
+
         state = .generating
 
         do {
@@ -52,6 +62,8 @@ final class CreateStoryViewModel: ObservableObject {
             )
             generatedStory = storyText
             state = .success
+            // Only increment AFTER a successful generation
+            StoryLimitStore.increment()
         } catch {
             state = .failed(error.localizedDescription)
         }

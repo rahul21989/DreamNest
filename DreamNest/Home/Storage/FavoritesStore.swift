@@ -7,7 +7,7 @@ public final class FavoritesStore: @unchecked Sendable {
 
     private let defaults: UserDefaults
 
-    public init(defaults: UserDefaults = .standard) {
+    public init(defaults: UserDefaults = UserDefaults.standard) {
         self.defaults = defaults
     }
 

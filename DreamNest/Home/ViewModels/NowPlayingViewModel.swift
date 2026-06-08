@@ -213,8 +213,10 @@ public final class NowPlayingViewModel: ObservableObject {
     private func startProgressTimer() {
         guard progressTimer == nil else { return }
         progressTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
-            guard let self else { return }
-            self.updateProgressFromAudio()
+            // Timer callbacks are nonisolated; hop to MainActor before touching @Published state.
+            Task { @MainActor [weak self] in
+                self?.updateProgressFromAudio()
+            }
         }
         RunLoop.main.add(progressTimer!, forMode: .common)
     }

@@ -19,6 +19,8 @@ public struct AudioTrack: Identifiable, Hashable, Sendable {
     public let bundleSubdirectory: String // relative to app bundle root (e.g. "Audio" or "Resources/Audio")
     /// If non-nil, this track is stored in the app's Documents directory at this relative path.
     public let documentsRelativePath: String?
+    /// Recording creation date — populated for user-created tracks only.
+    public let createdAt: Date?
 
     public init(
         id: String,
@@ -27,7 +29,8 @@ public struct AudioTrack: Identifiable, Hashable, Sendable {
         durationSeconds: TimeInterval,
         filename: String,
         bundleSubdirectory: String = "Audio",
-        documentsRelativePath: String? = nil
+        documentsRelativePath: String? = nil,
+        createdAt: Date? = nil
     ) {
         self.id = id
         self.title = title
@@ -36,6 +39,7 @@ public struct AudioTrack: Identifiable, Hashable, Sendable {
         self.filename = filename
         self.bundleSubdirectory = bundleSubdirectory
         self.documentsRelativePath = documentsRelativePath
+        self.createdAt = createdAt
     }
 
     public var isUserCreated: Bool { documentsRelativePath != nil }

@@ -20,6 +20,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>GEMINI_API_KEY</key>
 	<string>AIzaSyAexYdu8KLTeaY_V8OQLxMuJsq6VY4iOAE</string>
+	<key>GROQ_API_KEY</key>
+	<string>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</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>DreamNest uses the microphone so parents can record personal lullabies for their child.</string>
 	<key>UIApplicationSceneManifest</key>

@@ -55,7 +55,7 @@ struct NowPlayingView: View {
                 selectedRoutineID = rootViewModel.routines.first?.id
             }
         }
-        .onChange(of: nowPlayingViewModel.progress) { newValue in
+        .onChange(of: nowPlayingViewModel.progress) { _, newValue in
             guard !isSeeking else { return }
             sliderDraft = newValue
         }

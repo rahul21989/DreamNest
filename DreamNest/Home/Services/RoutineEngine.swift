@@ -34,7 +34,9 @@ public final class RoutineEngine {
     public var onStepChanged: ((Int) -> Void)?
     public var onFinished: (() -> Void)?
 
-    private var finishObserverToken: UUID?
+    // nonisolated(unsafe) lets deinit (which runs off the main actor) safely
+    // read the token to unregister the finish observer without a concurrency warning.
+    nonisolated(unsafe) private var finishObserverToken: UUID?
     private var playbackVolume: Float = 1
 
     public init(audioPlayerService: AudioPlayerService) {

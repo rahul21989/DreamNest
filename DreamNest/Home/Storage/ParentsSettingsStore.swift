@@ -12,7 +12,7 @@ public final class ParentsSettingsStore: @unchecked Sendable {
 
     public private(set) var settings: ParentsSettings
 
-    public init(defaults: UserDefaults = .standard) {
+    public init(defaults: UserDefaults = UserDefaults.standard) {
         self.defaults = defaults
         self.settings = (Self.load(from: defaults) ?? ParentsSettings()).clampedQuickSleepMinutes()
     }

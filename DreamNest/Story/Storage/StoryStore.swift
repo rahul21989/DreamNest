@@ -7,7 +7,7 @@ final class StoryStore: @unchecked Sendable {
 
     private let defaults: UserDefaults
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = UserDefaults.standard) {
         self.defaults = defaults
     }
 

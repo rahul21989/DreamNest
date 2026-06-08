@@ -124,7 +124,7 @@ private final class StorySpeechController: NSObject, ObservableObject {
         do {
             try AVAudioSession.sharedInstance().setCategory(
                 .playback, mode: .default,
-                options: [.allowBluetooth, .allowAirPlay]
+                options: [.allowBluetoothA2DP, .allowAirPlay]
             )
             try AVAudioSession.sharedInstance().setActive(true)
 

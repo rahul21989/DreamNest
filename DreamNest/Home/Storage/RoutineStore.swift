@@ -10,7 +10,7 @@ public final class RoutineStore: @unchecked Sendable {
 
     public private(set) var routines: [Routine]
 
-    public init(defaults: UserDefaults = .standard) {
+    public init(defaults: UserDefaults = UserDefaults.standard) {
         self.defaults = defaults
         self.routines = Self.load(from: defaults) ?? []
     }

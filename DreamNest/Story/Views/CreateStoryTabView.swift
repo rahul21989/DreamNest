@@ -66,6 +66,15 @@ struct CreateStoryTabView: View {
                     DownloadedStoriesScreen(viewModel: viewModel)
                 }
             }
+            // Daily limit popup
+            .alert("Daily Limit Reached 🌙", isPresented: $viewModel.showLimitAlert) {
+                Button("View Saved Stories") {
+                    path.append(.downloaded)
+                }
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("You can create \(StoryLimitStore.dailyLimit) stories per day. Come back tomorrow for more magic!\n\nMeanwhile, enjoy your saved stories — you can read them as many times as you like.")
+            }
         }
         .dreamNestNightMode()
     }
@@ -73,16 +82,25 @@ struct CreateStoryTabView: View {
     // MARK: Hero header
 
     private var storyHero: some View {
-        ZStack {
+        let remaining = StoryLimitStore.remaining
+        let limitReached = remaining == 0
+
+        return ZStack {
             LinearGradient(
                 colors: [Color.indigo.opacity(0.85), Color.purple.opacity(0.7)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
-            VStack(spacing: 10) {
+            // Decorative background icon
+            Image(systemName: "book.pages.fill")
+                .font(.system(size: 140))
+                .foregroundStyle(.white.opacity(0.05))
+                .offset(x: 80, y: 20)
+
+            VStack(spacing: 12) {
                 Image(systemName: "book.pages.fill")
-                    .font(.system(size: 52))
+                    .font(.system(size: 48))
                     .foregroundStyle(.white.opacity(0.95))
                     .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
 
@@ -95,9 +113,48 @@ struct CreateStoryTabView: View {
                     .foregroundStyle(.white.opacity(0.75))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
+
+                // ── Daily limit pill ─────────────────────────────────────
+                HStack(spacing: 6) {
+                    Image(systemName: limitReached ? "moon.zzz.fill" : "sparkles")
+                        .font(.caption.weight(.semibold))
+                    Text(limitReached
+                         ? "Daily limit reached"
+                         : "\(remaining) of \(StoryLimitStore.dailyLimit) stories left today")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(limitReached ? Color.orange : .white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(
+                    Capsule()
+                        .fill(limitReached
+                              ? Color.orange.opacity(0.25)
+                              : Color.white.opacity(0.18))
+                        .overlay(
+                            Capsule()
+                                .stroke(limitReached
+                                        ? Color.orange.opacity(0.5)
+                                        : Color.white.opacity(0.3),
+                                        lineWidth: 1)
+                        )
+                )
+
+                // ── Save nudge ───────────────────────────────────────────
+                NavigationLink(value: StoryRoute.downloaded) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.down.circle.fill")
+                            .font(.caption)
+                        Text("Save stories to read anytime — even offline")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.white.opacity(0.7))
+                    .padding(.top, 2)
+                }
             }
-            .padding(.top, 60)
-            .padding(.bottom, 30)
+            .padding(.top, 68)
+            .padding(.bottom, 28)
+            .padding(.horizontal, 20)
         }
         .frame(maxWidth: .infinity)
     }
@@ -261,7 +318,7 @@ struct CreateStoryTabView: View {
             }
             .disabled(!viewModel.canGenerate || viewModel.state == .generating)
 
-            if !viewModel.canGenerate && viewModel.state == .idle {
+            if !viewModel.canGenerate && viewModel.state == .idle && StoryLimitStore.remaining > 0 {
                 Label("Add a title and your idea to begin", systemImage: "info.circle")
                     .font(.caption)
                     .foregroundStyle(.secondary)

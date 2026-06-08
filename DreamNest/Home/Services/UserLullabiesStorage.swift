@@ -80,18 +80,12 @@ enum UserLullabiesStorage {
     }
 
     private static func durationSeconds(for url: URL) -> TimeInterval {
-        let asset = AVURLAsset(url: url)
-        let seconds = asset.duration.seconds
-        if seconds.isFinite, seconds > 0 { return seconds }
-
-        // Fallback best-effort.
+        // AVURLAsset.duration deprecated in iOS 16; AVAudioPlayer.duration is the sync alternative.
         do {
             let player = try AVAudioPlayer(contentsOf: url)
-            let fallback = player.duration
-            if fallback.isFinite, fallback > 0 { return fallback }
-        } catch {
-            // Ignore and return 0
-        }
+            let dur = player.duration
+            if dur.isFinite, dur > 0 { return dur }
+        } catch {}
         return 0
     }
 

@@ -128,14 +128,15 @@ public final class AudioPlayerService: NSObject, AVAudioPlayerDelegate {
     }
 
     private func configureAudioSessionForPlayback() {
-        let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(
+            // .allowBluetoothA2DP (not .allowBluetooth) is the correct option for
+            // playback-only sessions; .allowBluetooth is for HFP/recording contexts.
+            try AVAudioSession.sharedInstance().setCategory(
                 .playback,
                 mode: .default,
-                options: [.allowBluetooth, .allowAirPlay]
+                options: [.allowBluetoothA2DP, .allowAirPlay]
             )
-            try session.setActive(true)
+            try AVAudioSession.sharedInstance().setActive(true)
         } catch {
             // If configuration fails, app still functions in foreground; ignore here.
         }
@@ -161,7 +162,6 @@ public final class AudioPlayerService: NSObject, AVAudioPlayerDelegate {
     private func handleInterruption(_ notification: Notification) {
         guard let userInfo = notification.userInfo else { return }
 
-        let session = AVAudioSession.sharedInstance()
         let isCurrentlyPlaying = isPlaying
         if let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt {
             let type = AVAudioSession.InterruptionType(rawValue: typeValue)

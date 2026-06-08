@@ -151,7 +151,7 @@ extension LullabyRecordingManager: AVAudioRecorderDelegate {
         try? session.setCategory(
             .playback,
             mode: .default,
-            options: [.allowBluetooth, .allowAirPlay]
+            options: [.allowBluetoothA2DP, .allowAirPlay]
         )
         try? session.setActive(true)
     }

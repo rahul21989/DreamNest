@@ -15,44 +15,64 @@ struct CategoryTracksView: View {
         category.id.caseInsensitiveCompare("Lullabies") == .orderedSame
     }
     private var preDownloaded: [AudioTrack] { tracks.filter { !$0.isUserCreated } }
-    private var myLullabies:   [AudioTrack] { tracks.filter {  $0.isUserCreated } }
+
+    /// User recordings sorted oldest → newest so the most recent is at the bottom
+    private var myLullabies: [AudioTrack] {
+        tracks
+            .filter { $0.isUserCreated }
+            .sorted { ($0.createdAt ?? .distantPast) < ($1.createdAt ?? .distantPast) }
+    }
 
     private let allowedTypes: [UTType] = {
         [UTType(filenameExtension: "mp3"), UTType(filenameExtension: "m4a")].compactMap { $0 }
     }()
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Upload / Record card (Lullabies only)
-                if isLullabies {
+        List {
+            // ── Upload / Record card (Lullabies only) ──────────────────────
+            if isLullabies {
+                Section {
                     uploadRecordCard
-                }
-
-                // Track sections
-                if isLullabies {
-                    trackSection(title: "🎵 Lullabies", icon: "moon.stars.fill",
-                                 tracks: preDownloaded, canDelete: false)
-                    trackSection(title: "🎤 My Recordings", icon: "mic.fill",
-                                 tracks: myLullabies, canDelete: true)
-                } else {
-                    trackSection(title: category.displayName, icon: "music.note.list",
-                                 tracks: tracks, canDelete: false)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+                        .listRowSeparator(.hidden)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 20)
-            .padding(.bottom, 100)   // clearance for NowPlayingView
+
+            // ── Track sections ─────────────────────────────────────────────
+            if isLullabies {
+                trackSection(
+                    title: "🎵 Lullabies",
+                    icon: "moon.stars.fill",
+                    tracks: preDownloaded,
+                    canDelete: false
+                )
+                trackSection(
+                    title: "🎤 My Recordings",
+                    icon: "mic.fill",
+                    tracks: myLullabies,
+                    canDelete: true
+                )
+            } else {
+                trackSection(
+                    title: category.displayName,
+                    icon: "music.note.list",
+                    tracks: tracks,
+                    canDelete: false
+                )
+            }
         }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Color.clear)
         .navigationTitle(category.displayName)
         .navigationBarTitleDisplayMode(.large)
         .fileImporter(
             isPresented: $showFileImporter,
             allowedContentTypes: allowedTypes.isEmpty ? [.data] : allowedTypes,
-            allowsMultipleSelection: false
-        ) { result in
-            handleImport(result)
-        }
+            allowsMultipleSelection: false,
+            onCompletion: handleImport
+        )
         .dreamNestNightMode()
     }
 
@@ -62,30 +82,23 @@ struct CategoryTracksView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Add Your Own Lullaby")
                 .font(.subheadline.bold())
-                .foregroundStyle(.primary)
             Text("Upload a song or record your own voice — your child will love it 💛")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 12) {
-                // Upload
                 Button { showFileImporter = true } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "square.and.arrow.up.fill")
-                        Text("Upload")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.white.opacity(0.08))
-                    .foregroundStyle(.primary)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 1))
+                    Label("Upload", systemImage: "square.and.arrow.up.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)   // ← more reliable on iPad than .plain
 
-                // Record
                 Button {
                     if recordingManager.isRecording {
                         recordingManager.stop()
@@ -96,12 +109,11 @@ struct CategoryTracksView: View {
                         Task { await recordingManager.start() }
                     }
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: recordingManager.isRecording ? "stop.circle.fill" : "mic.circle.fill")
-                            .foregroundStyle(recordingManager.isRecording ? .red : Color.indigo)
-                        Text(recordingManager.isRecording ? "Stop" : "Record")
-                            .font(.subheadline.weight(.semibold))
-                    }
+                    Label(
+                        recordingManager.isRecording ? "Stop" : "Record",
+                        systemImage: recordingManager.isRecording ? "stop.circle.fill" : "mic.circle.fill"
+                    )
+                    .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background(recordingManager.isRecording
@@ -113,7 +125,7 @@ struct CategoryTracksView: View {
                         .stroke((recordingManager.isRecording ? Color.red : Color.indigo).opacity(0.3),
                                 lineWidth: 1))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)   // ← more reliable on iPad than .plain
             }
 
             if let err = importError ?? deleteError {
@@ -129,49 +141,62 @@ struct CategoryTracksView: View {
             .stroke(Color.white.opacity(0.08), lineWidth: 1))
     }
 
-    // MARK: - Track section
+    // MARK: - Track section (returns a Section inside the List)
 
     @ViewBuilder
     private func trackSection(title: String, icon: String,
                                tracks: [AudioTrack], canDelete: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        Section {
+            if tracks.isEmpty {
+                Text(canDelete ? "Your recordings will appear here." : "No tracks found.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .listRowBackground(Color.clear)
+            } else {
+                ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
+                    TrackRow(
+                        track: track,
+                        index: index,
+                        playlist: tracks,
+                        isLullabies: isLullabies,
+                        rootViewModel: rootViewModel,
+                        nowPlayingVM: rootViewModel.nowPlayingViewModel
+                    )
+                    // swipeActions inside a real List → works correctly on all devices
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        if canDelete {
+                            Button(role: .destructive) {
+                                deleteError = nil
+                                deleteTrack(track)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                    }
+                    .listRowBackground(
+                        rowBackground(isCurrent: rootViewModel.nowPlayingViewModel.currentTrackFilename == track.filename)
+                    )
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16))
+                }
+            }
+        } header: {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.indigo.opacity(0.8))
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                Spacer()
-                Text("\(tracks.count)")
+                Text("(\(tracks.count))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            }
-
-            if tracks.isEmpty {
-                Text(canDelete
-                     ? "Your recordings will appear here."
-                     : "No tracks found.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 8)
-            } else {
-                VStack(spacing: 2) {
-                    ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
-                        TrackRow(
-                            track: track,
-                            index: index,
-                            playlist: tracks,
-                            isLullabies: isLullabies,
-                            canDelete: canDelete,
-                            rootViewModel: rootViewModel,
-                            onDelete: { deleteTrack(track) }
-                        )
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 16))
             }
         }
+    }
+
+    private func rowBackground(isCurrent: Bool) -> some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(isCurrent ? Color.indigo.opacity(0.15) : Color.white.opacity(0.05))
     }
 
     // MARK: - Delete
@@ -184,7 +209,6 @@ struct CategoryTracksView: View {
             try UserLullabiesStorage.deleteUserLullaby(track)
             rootViewModel.removeFavorite(track.filename)
             rootViewModel.refreshAudioLibrary()
-            deleteError = nil
         } catch {
             deleteError = error.localizedDescription
         }
@@ -227,24 +251,33 @@ private struct TrackRow: View {
     let index: Int
     let playlist: [AudioTrack]
     let isLullabies: Bool
-    let canDelete: Bool
     @ObservedObject var rootViewModel: DreamNestRootViewModel
-    let onDelete: () -> Void
+    /// Observed directly so the row re-renders the moment isPlaying changes.
+    /// Observing rootViewModel alone is NOT enough — nested ObservableObject
+    /// changes don't propagate through a @Published property automatically.
+    @ObservedObject var nowPlayingVM: NowPlayingViewModel
 
     private var isCurrent: Bool {
-        rootViewModel.nowPlayingViewModel.currentTrackFilename == track.filename
+        nowPlayingVM.currentTrackFilename == track.filename
     }
     private var isPlayingCurrent: Bool {
-        isCurrent && rootViewModel.nowPlayingViewModel.isPlaying
+        isCurrent && nowPlayingVM.isPlaying
     }
 
+    private static let dateFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "dd MMM"   // e.g. "04 Jun"
+        return f
+    }()
+
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
+
             // Track number / playing indicator
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isCurrent ? Color.indigo.opacity(0.4) : Color.white.opacity(0.06))
-                    .frame(width: 36, height: 36)
+                    .fill(isCurrent ? Color.indigo.opacity(0.4) : Color.white.opacity(0.08))
+                    .frame(width: 38, height: 38)
 
                 if isPlayingCurrent {
                     Image(systemName: "waveform")
@@ -262,67 +295,66 @@ private struct TrackRow: View {
                 }
             }
 
-            // Title + duration
+            // Title + subtitle (date for recordings, duration for bundled)
             VStack(alignment: .leading, spacing: 3) {
                 Text(track.title)
                     .font(.subheadline)
                     .foregroundStyle(isCurrent ? Color.indigo : .primary)
                     .lineLimit(1)
-                Text(track.durationSeconds > 0
-                     ? track.durationSeconds.formattedMMSS()
-                     : "—")
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.secondary)
+
+                // User recordings: show "DD MMM" creation date
+                // Bundled tracks: show duration
+                if track.isUserCreated, let date = track.createdAt {
+                    Text(Self.dateFmt.string(from: date))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(track.durationSeconds > 0
+                         ? track.durationSeconds.formattedMMSS() : "—")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
             // Favourite (lullabies only)
             if isLullabies {
                 Button {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) {
-                        rootViewModel.toggleFavorite(track.filename)
-                    }
+                    rootViewModel.toggleFavorite(track.filename)
                 } label: {
                     Image(systemName: rootViewModel.isFavorite(track.filename) ? "heart.fill" : "heart")
-                        .font(.system(size: 16))
+                        .font(.system(size: 17))
                         .foregroundStyle(rootViewModel.isFavorite(track.filename) ? .pink : .secondary)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
             }
 
             // Play / Pause
             Button {
                 if isCurrent {
-                    rootViewModel.nowPlayingViewModel.togglePlayPause()
+                    nowPlayingVM.togglePlayPause()
                 } else {
-                    rootViewModel.nowPlayingViewModel.playTrack(track, playlist: playlist, index: index)
+                    nowPlayingVM.playTrack(track, playlist: playlist, index: index)
                 }
             } label: {
                 ZStack {
                     Circle()
-                        .fill(isCurrent ? Color.indigo : Color.indigo.opacity(0.25))
-                        .frame(width: 36, height: 36)
+                        .fill(isCurrent ? Color.indigo : Color.indigo.opacity(0.3))
+                        .frame(width: 44, height: 44)
                     Image(systemName: isPlayingCurrent ? "pause.fill" : "play.fill")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
-                        .offset(x: isPlayingCurrent ? 0 : 1)
+                        .offset(x: isPlayingCurrent ? 0 : 1.5)
                 }
+                .contentShape(Circle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderless)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(isCurrent
-                    ? Color.indigo.opacity(0.10)
-                    : Color.white.opacity(0.05))
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            if canDelete {
-                Button(role: .destructive) { onDelete() } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-            }
-        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .contentShape(Rectangle())
     }
 }

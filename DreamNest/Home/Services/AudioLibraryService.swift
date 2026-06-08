@@ -134,6 +134,10 @@ public final class AudioLibraryService: Sendable {
             // Compute relative path under Documents for later playback.
             let docsRelativePath = fileURL.path.replacingOccurrences(of: (docsRoot.path + "/"), with: "")
 
+            // Read file creation date so recordings can be sorted chronologically
+            let attrs = try? FileManager.default.attributesOfItem(atPath: fileURL.path)
+            let createdAt = attrs?[.creationDate] as? Date
+
             let duration = Self.durationSeconds(for: fileURL)
             tracks.append(
                 AudioTrack(
@@ -143,7 +147,8 @@ public final class AudioLibraryService: Sendable {
                     durationSeconds: duration,
                     filename: filename,
                     bundleSubdirectory: "",
-                    documentsRelativePath: docsRelativePath
+                    documentsRelativePath: docsRelativePath,
+                    createdAt: createdAt
                 )
             )
         }
@@ -171,17 +176,12 @@ public final class AudioLibraryService: Sendable {
     }
 
     private static func durationSeconds(for url: URL) -> TimeInterval {
-        let asset = AVURLAsset(url: url)
-        let seconds = asset.duration.seconds
-        if seconds.isFinite, seconds > 0 {
-            return seconds
-        }
-
-        // Fallback: AVAudioPlayer sometimes yields a usable duration where AVURLAsset does not.
+        // AVURLAsset.duration is deprecated in iOS 16 (use async load(.duration)).
+        // AVAudioPlayer.duration is the correct synchronous alternative.
         do {
             let player = try AVAudioPlayer(contentsOf: url)
-            let fallback = player.duration
-            if fallback.isFinite, fallback > 0 { return fallback }
+            let dur = player.duration
+            if dur.isFinite, dur > 0 { return dur }
         } catch {
             // Ignore: return 0 and let UI handle unknown durations.
         }
