@@ -3,7 +3,6 @@ import SwiftUI
 struct CulturalStoryListView: View {
     let template: CulturalTemplate
     @StateObject private var viewModel: CulturalStoryListViewModel
-    @State private var selectedStory: CulturalStory?
 
     init(template: CulturalTemplate) {
         self.template = template
@@ -29,11 +28,6 @@ struct CulturalStoryListView: View {
         .navigationTitle(template.name)
         .navigationBarTitleDisplayMode(.large)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .fullScreenCover(item: $selectedStory) { story in
-            CulturalStoryPlayerView(
-                viewModel: CulturalStoryPlayerViewModel(story: story, template: template)
-            )
-        }
         .task { await viewModel.loadStories() }
     }
 
@@ -70,9 +64,12 @@ struct CulturalStoryListView: View {
                 .padding(.top, 10)
 
                 ForEach(viewModel.stories) { story in
-                    StoryRowView(story: story) {
-                        selectedStory = story
+                    NavigationLink(destination: CulturalStoryPlayerView(
+                        viewModel: CulturalStoryPlayerViewModel(story: story, template: template)
+                    )) {
+                        StoryRowView(story: story)
                     }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.bottom, 24)
@@ -140,58 +137,58 @@ private struct LoadingIconView: View {
 
 private struct StoryRowView: View {
     let story: CulturalStory
-    let onTap: () -> Void
 
     private var isCached: Bool {
         CulturalStoryCache.shared.isAudioCached(for: story.id)
     }
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 14) {
-                // Icon
-                ZStack {
-                    Circle()
-                        .fill(Color.indigo.opacity(0.22))
-                        .frame(width: 46, height: 46)
-                    Image(systemName: isCached ? "play.fill" : "wand.and.stars")
-                        .font(.system(size: 17))
-                        .foregroundStyle(Color.indigo)
-                }
-
-                // Text
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(story.title)
-                        .font(.subheadline.bold())
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Text(story.summary)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-
-                Spacer(minLength: 4)
-
-                // Cached badge
-                if isCached {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.green.opacity(0.75))
-                }
+        HStack(spacing: 14) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(Color.indigo.opacity(0.22))
+                    .frame(width: 46, height: 46)
+                Image(systemName: isCached ? "play.fill" : "wand.and.stars")
+                    .font(.system(size: 17))
+                    .foregroundStyle(Color.indigo)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.white.opacity(0.05))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                    )
-            )
-            .padding(.horizontal)
+
+            // Text
+            VStack(alignment: .leading, spacing: 4) {
+                Text(story.title)
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Text(story.summary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 4)
+
+            // Cached badge / chevron
+            if isCached {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.green.opacity(0.75))
+            } else {
+                Image(systemName: "chevron.right")
+                    .font(.caption.bold())
+                    .foregroundStyle(.white.opacity(0.3))
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+        )
+        .padding(.horizontal)
     }
 }
